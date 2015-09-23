@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8>
+    <title>Spotify test</title>
+    <link href="spotify.css" media="all" rel="stylesheet" type="text/css"/>
+</head>
+<body>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script src="handlebars-v3.0.3.js"></script>
+<script src="spotify.jquery.js"></script>
+
+
+<div class="wrapper">
+
+    <div class="header">
+        <h3>Simple Spotify search</h3>
+
+        <form action="#" class="form-inline">
+            <div class="form-group">
+                <input type="text" class="form-control" id="searchBox" placeholder="type something">
+            </div>
+            <button type="submit" id="searchButton" class="btn btn-default">Search</button>
+        </form>
+
+    </div>
+
+    <!-- Divs for search results -->
+
+    <div class="col-md-4" id="div-1">
+        <h4>Artists</h4>
+        <div id="divArtists"></div>
+    </div>
+
+    <div class="col-md-4" id="div-2">
+        <h4>Albums</h4>
+        <div id="divAlbums"></div>
+    </div>
+
+    <div class="col-md-4" id="div-3">
+        <h4>Tracks</h4>
+        <ul class="list-group" id="divTracks"></ul>
+    </div>
+
+    <!-- Needed to keep the footer down (Ryan Fait's HTML5 CSS Sticky Footer) -->
+    <div class="push"></div>
+</div>
+
+
+<div class="footer">
+    <p>This site uses <a href="https://jquery.com/">jQuery</a> plugin to fetch JSON data from <a
+            href="https://developer.spotify.com/web-api/">Spotify</a> web API, <a href="http://handlebarsjs.com/">Handlebars</a>
+        for templating and
+        <a href="http://getbootstrap.com/">Bootstrap</a> for some UI elements. <br> Made for practice by Mikko Riippi.
+    </p>
+</div>
+
+<!-- Bootstrap modal that is shown when artist or album is clicked -->
+<div class="modal fade" id="infoModal" tabindex="-1" role="dialog" aria-labelledby="infoModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="modalLabel">A label</h4>
+            </div>
+
+            <div class="modal-body">
+                <img id="modal-image" class="MaxSized" src="http://placehold.it/200x200">
+                <div id="modal-info"></div>
+                <div id="modal-toptracks"></div>
+                <div id="modal-related"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // Javascript for info modal
+    $('#infoModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget); // Button that triggered the modal
+        var name = button.data('name');
+        var modal = $(this);
+        var id = button.data('id');
+        var type = button.data('type');
+        var modalImage = $('#modal-image');
+
+        // Clear the old stuff
+        $('#modal-toptracks').empty();
+        $('#modal-related').empty();
+
+        modalImage.attr("src", 'http://placehold.it/200x200');
+
+
+        $.ajax({
+            url: button.data('link'),
+            dataType: 'json',
+            success: function (json) {
+                var image = json.images[1];
+
+                if (image !== undefined) {
+                    modalImage.attr("src", image.url);
+                }
+                var template = Handlebars.compile($('#modal-info-template').html());
+                var data = template(json);
+
+                $('#modal-info')['fadeToggle'](200, function () {
+                    $(this).html(data)['fadeToggle'](200);
+                });
+            }
+        });
+
+        modal.find('.modal-title').text(button.data('name'));
+
+        if (type != "artist") {
+            // If type is not artist, there is nothing more to show
+            return;
+        }
+
+        // Request for artist top tracks
+        var topTracskUrl = 'https://api.spotify.com/v1/artists/' + id + '/top-tracks?country=SE';
+
+        $.ajax({
+            url: topTracskUrl,
+            dataType: 'json',
+            success: function (json) {
+                var template = Handlebars.compile($('#modal-toptracks-template').html());
+                var data = template(json.tracks);
+                $('#modal-toptracks')['fadeToggle'](200, function () {
+                    $(this).html(data)['fadeToggle'](200);
+                });
+            }
+        });
+
+        // Request for similar artists
+        var relatedUrl = 'https://api.spotify.com/v1/artists/' + id + '/related-artists';
+
+        $.ajax({
+            url: relatedUrl,
+            dataType: 'json',
+            success: function (json) {
+                var template = Handlebars.compile($('#modal-related-template').html());
+                var data = template(json.artists);
+                $('#modal-related')['fadeToggle'](200, function () {
+                    $(this).html(data)['fadeToggle'](200);
+                });
+            }
+        });
+    })
+
+</script>
+
+
+<!-- Handlebars template for album / artist -->
+<script id="modal-info-template" type="text/x-handlebars.template">
+    <p>Popularity: {{popularity}} / 100</p>
+    <p>Spotify URI: <a href="{{uri}}" data-toggle="tooltip" data-placement="top" title="Open in spotify">{{uri}}</a></p>
+
+    {{#if artists}}
+    <p>Artist:
+        {{#each artists}}
+        {{this.name}}
+        {{/each}}
+    </p>
+    {{/if}}
+
+    {{#if tracks}}
+    <p>Tracks:</p>
+
+    <ul class="list-group">
+
+        {{#each tracks.items}}
+        <li class="list-group-item">
+            {{this.name}}
+        </li>
+
+        {{/each}}
+    </ul>
+    {{/if}}
+
+</script>
+
+    
+<!-- Handlebars template for related artists -->
+<script id="modal-related-template" type="text/x-handlebars.template">
+    <p>Related artists</p><p>
+        {{#each this}}
+        <span class="label label-default">{{name}}</span>
+        {{/each}}
+    </p>
+</script>
+
+<!-- Handlebars template for top tracks -->
+<script id="modal-toptracks-template" type="text/x-handlebars.template">
+    <p>Top tracks</p><p>
+        {{#each this}}
+        <span class="label label-default">{{name}}</span>
+        {{/each}}
+    </p>
+</script>
+
+
+<!-- Handlebars template for artist search results -->
+<script id="artists-template" type="text/x-handlebars.template">
+    {{#each this}}
+    <div class="clickable" data-toggle="tooltip" data-placement="top" title="Open info dialog">
+        <a href="#" data-toggle="modal" data-target="#infoModal" data-name="{{name}}" data-id="{{id}}"
+           data-link="{{href}}" data-type="artist"></a>
+
+        <p><img src="{{lastObject images}}" class="list"> {{name}} </p>
+    </div>
+    {{/each}}
+</script>
+
+<!-- Handlebars template for albums search results -->
+<script id="albums-template" type="text/x-handlebars.template">
+    {{#each this}}
+    <div class="clickable" data-toggle="tooltip" data-placement="top" title="Open info dialog">
+        <a href="#" data-toggle="modal" data-target="#infoModal" data-name="{{name}}" data-id="{{id}}"
+           data-link="{{href}}" data-type="album"></a>
+
+        <p><img src="{{lastObject images}}" class="list"> {{name}}</p>
+    </div>
+    {{/each}}
+</script>
+
+<!-- Handlebars template for tracks search results -->
+<script id="tracks-template" type="text/x-handlebars.template">
+    {{#each this}}
+    <li class="list-group-item">
+        <p><b>{{name}}</b>
+
+            {{#if artists}}
+            by:
+            {{#each artists}}
+            {{this.name}}
+            {{/each}}
+
+            {{/if}}<br>
+            <a href="{{uri}}" data-toggle="tooltip" data-placement="top" title="Open track in spotify">{{uri}}</a></p>
+    </li>
+    {{/each}}
+</script>
+
+
+<script>
+
+    // Search and initalisation ( jQuery )
+    (function ($) {
+
+        var Spotify = {
+            init: function () {
+
+                var self = this;
+                this.searchInput = $('#searchBox');
+
+                // Handlebars helper for getting a last image from an array
+                Handlebars.registerHelper("lastObject", function (array) {
+
+                    if (array === undefined) {
+                        return 'http://placehold.it/64x64';
+                    }
+
+                    var last = array[array.length - 1];
+
+                    if (last === undefined) {
+                        return 'http://placehold.it/64x64';
+                    }
+
+                    return last.url;
+
+                });
+
+
+                // Search when enter is pressed
+                this.searchInput.keypress(function (event) {
+                    if (event.which == 13) {
+                        event.preventDefault();
+                        self.query = this.value;
+                        self.fetchJSON();
+                    }
+                });
+
+                // Search when button is clicked
+                $("#searchButton").click(function (event) {
+                    event.preventDefault();
+
+                    self.query = self.searchInput.val();
+                    console.log(self.query);
+
+                    self.fetchJSON();
+                });
+
+                return this;
+            },
+
+            fetchJSON: function () {
+
+                var self = Spotify;
+
+                $('#divArtists').querySpotify({
+                    search: self.query,
+                    limit: 12,
+                    handlebarsTemplate: $('#artists-template'),
+                    createFooter: function (results) {
+                        var info;
+                        if (results.artists.items.length == 0) {
+                            return "No artists found";
+                        } else {
+                            info = "Showing first " + results.artists.items.length + " of " + results.artists.total;
+                        }
+                        return "<p>" + info + "</p>";
+                    },
+                    editResponse: function (results) {
+                        return results.artists.items;
+                    },
+                    type: 'artist'
+                });
+
+
+                $('#divAlbums').querySpotify({
+                    search: self.query,
+                    type: 'album',
+                    limit: 12,
+                    handlebarsTemplate: $('#albums-template'),
+                    createFooter: function (results) {
+                        var info;
+                        if (results.albums.items.length == 0) {
+                            return "No albums found";
+                        } else {
+                            info = "Showing first " + results.albums.items.length + " of " + results.albums.total;
+                        }
+                        return "<p>" + info + "</p>";
+                    },
+                    editResponse: function (results) {
+                        return results.albums.items;
+                    }
+                });
+
+                $('#divTracks').querySpotify({
+                    search: self.query,
+                    type: 'track',
+                    limit: 15,
+                    handlebarsTemplate: $('#tracks-template'),
+                    createFooter: function (results) {
+                        var info;
+                        if (results.tracks.items.length == 0) {
+                            return "No tracks found";
+                        } else {
+                            info = "Showing first " + results.tracks.items.length + " of " + results.tracks.total;
+                        }
+                        return "<p>" + info + "</p>";
+                    },
+                    editResponse: function (results) {
+                        return results.tracks.items;
+                    }
+                });
+            }
+        };
+
+        window.Spotify = Spotify.init();
+
+    })(jQuery);
+
+</script>
+
+
+</body>
+</html>
+    
